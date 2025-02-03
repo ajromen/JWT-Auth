@@ -41,10 +41,16 @@ namespace JwtAuthStart.Controllers
         }
 
         [Authorize]
-        [HttpGet]
+        [HttpGet("auth-only")]
         public IActionResult AuthenticatedOnlyEndpoint()
         {
             return Ok("You are authenticated");
+        }
+        [Authorize(Roles="Admin")]//Admin,nekodrugi,...
+        [HttpGet("admin-only")]
+        public IActionResult AdminOnlyEndpoint()
+        {
+            return Ok("You are dozvoljen za ovo");
         }
     }
 
