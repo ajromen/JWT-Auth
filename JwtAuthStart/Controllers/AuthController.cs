@@ -1,5 +1,7 @@
 ﻿using JwtAuthStart.DTOs;
+using JwtAuthStart.Interfaces.Services;
 using JwtAuthStart.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -14,55 +16,35 @@ namespace JwtAuthStart.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class AuthController(IConfiguration configuration) : ControllerBase
+    public class AuthController(IAuthService authService) : ControllerBase
     {
-        public static User user = new User();
-
         [HttpPost("register")]
-        public ActionResult<User> Register(UserDTO request)
+        public async Task<ActionResult<User>> Register(UserDTO request)
         {
-            var hashedPass = new PasswordHasher<User>().HashPassword(user, request.Password);
-
-            user.Username= request.Username;
-            user.Password= hashedPass;
-
+            var user = await authService.ReisterAsync(request);
+            if (user == null)
+            {
+                return BadRequest("Username alredy exists");
+            }
             return Ok(user);
         }
-        [HttpPost("login")]
-        public ActionResult<string> Login(UserDTO request)
-        {
-            if (user.Username != request.Username)
-            {
-                return BadRequest("User not found");
-            }
-            if (new PasswordHasher<User>().VerifyHashedPassword(user, user.Password, request.Password) == PasswordVerificationResult.Failed)
-            {
-                return BadRequest("Wrong password");
-            }
 
-            string token = CreateToken(user);
+        [HttpPost("login")]
+        public async Task<ActionResult<string>> Login(UserDTO request)
+        {
+            var token = await authService.LoginAsync(request);
+            if (string.IsNullOrEmpty(token))
+            {
+                return BadRequest("Invalid username or password");
+            }
             return Ok(token);
         }
 
-        private string CreateToken(User user)
+        [Authorize]
+        [HttpGet]
+        public IActionResult AuthenticatedOnlyEndpoint()
         {
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.Name, user.Username)
-            };
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(configuration.GetValue<string>("AppSettings:Token")!));
-
-            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha512);
-
-            var tokenDescriptor = new JwtSecurityToken(
-                issuer: configuration.GetValue<string>("AppSettings:Issuer"),
-                audience: configuration.GetValue<string>("AppSettings:Audience"),
-                claims: claims,
-                expires: DateTime.UtcNow.AddDays(1),
-                signingCredentials: credentials);
-
-            return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
+            return Ok("You are authenticated");
         }
     }
 
